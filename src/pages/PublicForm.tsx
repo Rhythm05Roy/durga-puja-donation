@@ -78,7 +78,6 @@ export default function PublicForm() {
   const [name, setName] = useState('');
   const [present, setPresent] = useState('');
   const [permanent, setPermanent] = useState('');
-  const [medOn, setMedOn] = useState(true);
   const [medAmt, setMedAmt] = useState('');
   const [geetaOn, setGeetaOn] = useState(false);
   const [geetaQty, setGeetaQty] = useState(1);
@@ -101,15 +100,14 @@ export default function PublicForm() {
 
   const total = useMemo(
     () =>
-      (medOn ? medNum : 0) +
+      medNum +
       (geetaOn ? geetaQty * PRICES.geeta : 0) +
       (treeOn ? treeQty * PRICES.tree : 0) +
       (clothOn ? clothQty * PRICES.cloth : 0),
-    [medOn, medNum, geetaOn, geetaQty, treeOn, treeQty, clothOn, clothQty]
+    [medNum, geetaOn, geetaQty, treeOn, treeQty, clothOn, clothQty]
   );
 
   // stable toggles so memoized cards skip re-render
-  const toggleMed = useCallback(() => setMedOn((v) => !v), []);
   const toggleGeeta = useCallback(() => setGeetaOn((v) => !v), []);
   const toggleTree = useCallback(() => setTreeOn((v) => !v), []);
   const toggleCloth = useCallback(() => setClothOn((v) => !v), []);
@@ -118,8 +116,8 @@ export default function PublicForm() {
     const e: string[] = [];
     if (!name.trim()) e.push('নাম আবশ্যক');
     if (!present.trim()) e.push('বর্তমান ঠিকানা আবশ্যক');
-    if (medOn && medNum <= 0) e.push('ঔষধের জন্য টাকার পরিমাণ আবশ্যক');
-    if (!medOn && !geetaOn && !treeOn && !clothOn) e.push('কমপক্ষে একটি প্রণামির অপশন বেছে নিন');
+    if (medNum <= 0) e.push('ঔষধের জন্য টাকার পরিমাণ আবশ্যক');
+    if (!geetaOn && !treeOn && !clothOn && medNum <= 0) e.push('কমপক্ষে একটি প্রণামির অপশন বেছে নিন');
     if (!pay) e.push('পেমেন্ট মাধ্যম বেছে নিন');
     if (!toEn(phone).replace(/\D/g, '').match(/^01\d{9}$/)) e.push('সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)');
     if (!txn.trim()) e.push('ট্রানজেকশন আইডি আবশ্যক');
@@ -142,7 +140,7 @@ export default function PublicForm() {
         name: name.trim(),
         present_address: present.trim(),
         permanent_address: permanent.trim() || null,
-        medicine_amount: medOn ? medNum : 0,
+        medicine_amount: medNum,
         donate_geeta: geetaOn,
         geeta_qty: geetaOn ? geetaQty : 0,
         donate_tree: treeOn,
@@ -262,14 +260,21 @@ export default function PublicForm() {
       <Card>
         <SectionHead step="২" title="প্রণামির ধরন বেছে নিন" hint="একাধিক অপশন একসাথে বেছে নেওয়া যায়" />
 
-        {/* ঔষধ (amount input ভেতরে, তাই আলাদা) */}
+        {/* ঔষধ (required) */}
         <div className="mt-4 grid gap-3">
-          <DonateOptionCard
-            icon="💊" title="ঔষধ প্রণামি" desc="অসহায় রোগীদের জন্য ঔষধের টাকা" required
-            checked={medOn} onToggle={toggleMed}
-          />
-          {medOn && (
-            <div className="-mt-1 ml-4 mr-4 rounded-2xl border-2 border-dashed border-gold-400 bg-gold-50/60 p-3.5">
+          <div className="rounded-2xl border-2 border-maroon-600 bg-gradient-to-br from-gold-50 to-white p-3.5 shadow-card sm:p-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-gold-200 bg-linen text-2xl">
+                💊
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-maroon-900">
+                  ঔষধ প্রণামি <span className="text-maroon-500">*</span>
+                </p>
+                <p className="text-xs text-stone-500">অসহায় রোগীদের জন্য ঔষধের টাকা</p>
+              </div>
+            </div>
+            <div className="mt-3 ml-4 mr-4">
               <Field label="ঔষধের জন্য টাকার পরিমাণ (৳)" required>
                 <div className="relative">
                   <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-maroon-600">৳</span>
@@ -286,7 +291,7 @@ export default function PublicForm() {
                 <p className="mt-2 text-right text-sm font-bold text-maroon-700">= {formatTaka(medNum)}</p>
               )}
             </div>
-          )}
+          </div>
 
           <DonateOptionCard
             icon="📕" title="গীতা বই" desc="ধর্মীয় জ্ঞান বিতরণ" unitPrice={PRICES.geeta}
@@ -309,11 +314,10 @@ export default function PublicForm() {
             <p className="text-2xl font-bold sm:text-3xl">{formatTaka(total)}</p>
           </div>
           <div className="space-y-0.5 text-right text-xs leading-5 text-amber-100">
-            {medOn && <div>💊 ঔষধ: {formatTaka(medNum)}</div>}
+            <div>💊 ঔষধ: {formatTaka(medNum)}</div>
             {geetaOn && <div>📕 গীতা × {toBn(geetaQty)} = {formatTaka(geetaQty * PRICES.geeta)}</div>}
             {treeOn && <div>🌳 গাছ × {toBn(treeQty)} = {formatTaka(treeQty * PRICES.tree)}</div>}
             {clothOn && <div>👕 কাপড় × {toBn(clothQty)} = {formatTaka(clothQty * PRICES.cloth)}</div>}
-            {!medOn && !geetaOn && !treeOn && !clothOn && <div>উপরে অপশন বেছে নিন 👆</div>}
           </div>
         </div>
       </Card>
