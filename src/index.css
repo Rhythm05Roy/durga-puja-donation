@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html {
+  -webkit-tap-highlight-color: transparent;
+  /* ট্যাব বদলানোর সময় scrollbar এসে/গিয়ে পেজ কাঁপা বন্ধ করে */
+  scrollbar-gutter: stable;
+}
+
+body {
+  font-family: 'Tiro Bangla', 'Hind Siliguri', serif;
+  background: #FFF9EE;
+  color: #4a1520;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Linen base + subtle alpana dot pattern */
+.puja-bg {
+  background-color: #FFF9EE;
+  background-image: radial-gradient(circle at 1.5px 1.5px, rgba(141, 36, 48, 0.055) 1.5px, transparent 1.6px);
+  background-size: 26px 26px;
+}
+
+/* Alpana band — temple trim */
+.alpana-band {
+  background-image: repeating-linear-gradient(
+    -45deg, #8d2430 0 10px, #e0b455 10px 20px, #FFF9EE 20px 30px
+  );
+  height: 6px;
+}
+
+.card-shadow { box-shadow: 0 2px 4px rgba(101,24,34,.04), 0 12px 28px -12px rgba(101,24,34,.14); }
+
+input, select, textarea { font-size: 16px; } /* prevent iOS zoom */
+::selection { background: #f4c8cd; }
+
+/* Diya flame flicker */
+.flame { transform-origin: center 78%; animation: flame 2.4s ease-in-out infinite; }
+@keyframes flame {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.1, 0.92); }
+}
+
+/* Sticky mobile bar respects iPhone home indicator */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Accessibility: visible focus for keyboard users */
+:focus-visible {
+  outline: 2px solid #e0b455;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html { scroll-behavior: auto; }
+}
