@@ -1,6 +1,7 @@
 import { SITE } from '../config';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { Diya, Mandala, OrnamentDivider } from './Ornament';
+import { Mandala, OrnamentDivider } from './Ornament';
+import Logo from './Logo';
 
 /** পাবলিক প্রণামি লিংকে শুধু ফরম দেখায় — অ্যাডমিন/সংগ্রহের কোনো লিংক নেই।
  *  /collect ও /admin শুধু সরাসরি URL দিয়ে ঢোকা যায় (পাসওয়ার্ড সুরক্ষিত)। */
@@ -16,7 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="relative mx-auto max-w-2xl">
-          <Diya size={40} className="mx-auto" />
+          <Logo size={78} ring sizeClass="h-20 w-20 sm:h-28 sm:w-28" className="mx-auto" />
           <p className="mt-2 inline-block rounded-full border border-gold-400/60 bg-white/10 px-3 py-0.5 text-xs font-semibold tracking-wide text-amber-100">
             শারদীয় শুভেচ্ছা {SITE.yearBn}
           </p>

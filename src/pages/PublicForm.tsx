@@ -1,12 +1,13 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { PAYMENT_BRAND, PAYMENT_LABELS, PAYMENT_NUMBERS, PRICES, SITE, EVENTS, PUJA_SCHEDULE, formatPayNumber, localPayNumber } from '../config';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { formatTaka, toBn, toEn } from '../lib/bn';
+import { downloadSheetPdf, downloadSheetPng } from '../lib/exportSheet';
 import QtyStepper from '../components/QtyStepper';
-import { Diya, OrnamentDivider } from '../components/Ornament';
+import InvitationSheet, { SHEET_W } from '../components/InvitationSheet';
+import { OrnamentDivider } from '../components/Ornament';
+import Logo from '../components/Logo';
 import { WalletIcon } from '../components/WalletIcon';
 import { Card, Field, inputBase, PrimaryButton, SectionHead } from '../components/ui';
 
@@ -77,8 +78,9 @@ const DonateOptionCard = memo(function DonateOptionCard({
 });
 
 export default function PublicForm() {
-  const invitationRef = useRef<HTMLDivElement>(null);
-  const [downloading, setDownloading] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState<'png' | 'pdf' | null>(null);
+  const [downloadErr, setDownloadErr] = useState('');
   const [name, setName] = useState('');
   const [present, setPresent] = useState('');
   const [permanent, setPermanent] = useState('');
@@ -166,47 +168,70 @@ export default function PublicForm() {
     }
   }
 
-  async function downloadImage() {
-    if (!invitationRef.current) return;
-    setDownloading(true);
-    try {
-      const canvas = await html2canvas(invitationRef.current, { scale: 2, useCORS: true });
-      const link = document.createElement('a');
-      link.download = `durga-puja-${SITE.yearBn}-invitation.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } finally {
-      setDownloading(false);
-    }
-  }
+  // ─── ডাউনলোড: অফ-স্ক্রিন A4 আমন্ত্রণপত্র থেকে ছবি/PDF ───
+  const fileBase = useMemo(() => {
+    const slug = name.trim().replace(/\s+/g, '-').slice(0, 30);
+    return `durga-puja-${SITE.yearBn}-invitation${slug ? `-${slug}` : ''}`;
+  }, [name]);
 
-  async function downloadPDF() {
-    if (!invitationRef.current) return;
-    setDownloading(true);
+  const breakdown = useMemo(() => {
+    const list: string[] = [];
+    if (medNum > 0) list.push(`💊 ঔষধ ${formatTaka(medNum)}`);
+    if (geetaOn) list.push(`📕 গীতা × ${toBn(geetaQty)} = ${formatTaka(geetaQty * PRICES.geeta)}`);
+    if (treeOn) list.push(`🌳 বৃক্ষ × ${toBn(treeQty)} = ${formatTaka(treeQty * PRICES.tree)}`);
+    if (clothOn) list.push(`👕 বস্ত্র × ${toBn(clothQty)} = ${formatTaka(clothQty * PRICES.cloth)}`);
+    return list;
+  }, [medNum, geetaOn, geetaQty, treeOn, treeQty, clothOn, clothQty]);
+
+  async function runDownload(kind: 'png' | 'pdf') {
+    const node = sheetRef.current;
+    if (!node || downloading) return;
+    setDownloading(kind);
+    setDownloadErr('');
     try {
-      const canvas = await html2canvas(invitationRef.current, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfW = pdf.internal.pageSize.getWidth();
-      const pdfH = (canvas.height * pdfW) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
-      pdf.save(`durga-puja-${SITE.yearBn}-invitation.pdf`);
+      if (kind === 'png') {
+        await downloadSheetPng(node, `${fileBase}.png`);
+      } else {
+        await downloadSheetPdf(node, `${fileBase}.pdf`, `${SITE.org} — আমন্ত্রণপত্র ${SITE.yearBn}`);
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+      setDownloadErr('ডাউনলোড করা যায়নি। আবার চেষ্টা করুন অথবা স্ক্রিনশট নিন।');
     } finally {
-      setDownloading(false);
+      setDownloading(null);
     }
   }
 
   // ─── ✅ সফল প্রণামি রসিদ + আমন্ত্রণ ───
   if (done) {
     return (
+      <>
+      {/* অফ-স্ক্রিন A4 আমন্ত্রণপত্র — শুধু ডাউনলোডের জন্য রেন্ডার হয়।
+          অ্যানিমেটেড কনটেইনারের বাইরে রাখা হয়েছে যাতে ক্যাপচারের সময়
+          transform/opacity ক্যাপচারে প্রভাব না ফেলে। */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none"
+        style={{ position: 'absolute', top: 0, left: -99999, width: SHEET_W, zIndex: -1 }}
+      >
+        <InvitationSheet
+          ref={sheetRef}
+          name={name.trim()}
+          total={total}
+          payLabel={PAYMENT_LABELS[pay] ?? '—'}
+          txn={txn.trim()}
+          breakdown={breakdown}
+        />
+      </div>
+
       <div className="animate-fadeUp space-y-4">
-        {/* Downloadable Invitation Card */}
-        <div ref={invitationRef} className="relative overflow-hidden rounded-3xl border-2 border-gold-400 bg-gradient-to-b from-[#fdf6e3] via-white to-[#fdf6e3] shadow-pop">
+        {/* On-screen receipt */}
+        <div className="relative rounded-3xl border-2 border-gold-400 bg-[#fdf6e3] shadow-pop">
           {/* Top Band */}
           <div className="alpana-band" />
 
           <div className="p-5 text-center sm:p-8">
-            <Diya size={48} className="mx-auto" />
+            <Logo size={76} className="mx-auto" />
 
             <h1 className="mt-3 font-serifbn text-xl font-bold text-maroon-800 sm:text-2xl">
               {SITE.org}
@@ -232,11 +257,11 @@ export default function PublicForm() {
             </p>
 
             {/* Donation Summary */}
-            <div className="mx-auto mt-4 inline-block rounded-2xl border-2 border-dashed border-gold-400 bg-gold-50 px-6 py-3">
+            <div className="mx-auto mt-4 w-fit max-w-full rounded-2xl border-2 border-gold-400 bg-gold-50 px-6 py-3">
               <p className="text-xs text-stone-500">মোট প্রণামি</p>
               <p className="text-3xl font-bold text-maroon-700">{formatTaka(total)}</p>
-              <p className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-stone-500">
-                <WalletIcon wallet={pay} size={14} /> {PAYMENT_LABELS[pay]} • TrxID: {txn}
+              <p className="mt-1 text-[11px] text-stone-500">
+                {PAYMENT_LABELS[pay]} • TrxID: {txn}
               </p>
             </div>
 
@@ -283,20 +308,28 @@ export default function PublicForm() {
         {/* Download Buttons */}
         <div className="flex gap-3">
           <button
-            onClick={() => void downloadImage()}
-            disabled={downloading}
+            onClick={() => void runDownload('png')}
+            disabled={downloading !== null}
             className="flex-1 rounded-xl border-2 border-maroon-600 bg-white py-3 font-bold text-maroon-700 shadow-card transition hover:bg-maroon-50 active:scale-95 disabled:opacity-50"
           >
-            {downloading ? '⏳ তৈরি হচ্ছে...' : '📥 ছবি ডাউনলোড'}
+            {downloading === 'png' ? '⏳ তৈরি হচ্ছে...' : '🖼️ ছবি ডাউনলোড'}
           </button>
           <button
-            onClick={() => void downloadPDF()}
-            disabled={downloading}
+            onClick={() => void runDownload('pdf')}
+            disabled={downloading !== null}
             className="flex-1 rounded-xl bg-maroon-700 py-3 font-bold text-amber-200 shadow-card transition hover:bg-maroon-800 active:scale-95 disabled:opacity-50"
           >
-            {downloading ? '⏳ তৈরি হচ্ছে...' : '📄 PDF ডাউনলোড'}
+            {downloading === 'pdf' ? '⏳ তৈরি হচ্ছে...' : '📄 PDF ডাউনলোড'}
           </button>
         </div>
+        <p className="text-center text-xs text-stone-500">
+          ডাউনলোডে পাবেন সম্পূর্ণ এক পাতার (A4) সাজানো আমন্ত্রণপত্র — ছাপার উপযোগী।
+        </p>
+        {downloadErr && (
+          <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-sm text-red-700">
+            {downloadErr}
+          </p>
+        )}
 
         <button
           onClick={() => window.location.reload()}
@@ -305,6 +338,7 @@ export default function PublicForm() {
           নতুন প্রণামি করুন
         </button>
       </div>
+      </>
     );
   }
 
@@ -436,7 +470,7 @@ export default function PublicForm() {
       {/* ৩. পেমেন্ট */}
       <Card>
         <SectionHead step="৩" title="পেমেন্টের তথ্য" hint="প্রণামি পাঠাতে নিচের নম্বরে সেন্ড মানি করুন" />
-        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
           {Object.keys(PAYMENT_LABELS).map((k) => {
             const active = pay === k;
             const brand = PAYMENT_BRAND[k];
@@ -447,14 +481,14 @@ export default function PublicForm() {
                 onClick={() => setPay(k)}
                 aria-pressed={active}
                 style={active ? { borderColor: brand, backgroundColor: `${brand}12`, boxShadow: `0 0 0 3px ${brand}26` } : undefined}
-                className={`flex flex-col items-center gap-1 rounded-2xl border-2 bg-white px-2 py-3.5 font-bold transition active:scale-95 ${
+                className={`flex flex-col items-center gap-2 rounded-2xl border-2 bg-white px-4 py-5 font-bold transition active:scale-95 ${
                   active ? 'text-maroon-900' : 'border-stone-200 text-stone-600 hover:border-gold-300'
                 }`}
               >
-                <span className="grid h-10 w-full place-items-center">
-                  <WalletIcon wallet={k} size={k === 'bkash' ? 24 : 36} />
+                <span className="grid h-12 w-full place-items-center">
+                  <WalletIcon wallet={k} size={36} />
                 </span>
-                <span className="text-sm">{PAYMENT_LABELS[k]}</span>
+                <span className="text-base">{PAYMENT_LABELS[k]}</span>
                 <span className={`text-[10px] font-bold ${active ? '' : 'text-transparent'}`} style={{ color: active ? brand : undefined }}>
                   ✓ নির্বাচিত
                 </span>

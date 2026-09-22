@@ -30,39 +30,35 @@ export const PUJA_SCHEDULE = [
 
 // প্রতিটি প্রণামি-আইটেমের একক মূল্য (টাকা)
 export const PRICES = {
-  geeta: 250,
-  tree: 100,
-  cloth: 350,
+  geeta: 120,
+  tree: 80,
+  cloth: 500,
 };
 
 // টাকা পাঠানোর (রিসিভার) নম্বর
 export const PAYMENT_NUMBERS: Record<string, string> = {
-  bkash: '+8801956508898',
-  rocket: '+8801956508898',
-  nagad: '+8801956508898',
+  bkash: '01773377786',
+  nagad: '01773377786',
 };
 
 export const PAYMENT_LABELS: Record<string, string> = {
   bkash: 'বিকাশ',
-  rocket: 'রকেট',
   nagad: 'নগদ',
 };
 
 export const PAYMENT_BRAND: Record<string, string> = {
   bkash: '#E2136E',
-  rocket: '#8C3494',
   nagad: '#F6921E',
 };
 
 export function formatPayNumber(n: string): string {
   const d = n.replace(/\D/g, '');
-  if (d.length === 13 && d.startsWith('880')) return `+880 ${d.slice(3, 7)}-${d.slice(7)}`;
+  if (d.length === 11 && d.startsWith('01')) return `${d.slice(0, 3)}-${d.slice(3)}`;
   return n;
 }
 
 export function localPayNumber(n: string): string {
-  const d = n.replace(/\D/g, '');
-  return d.startsWith('880') ? '0' + d.slice(3) : d;
+  return n.replace(/\D/g, '');
 }
 
 export const AUTH = {

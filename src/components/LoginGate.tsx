@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getErrorMessage } from '../lib/errors';
 import type { Session } from '../lib/auth';
-import { Diya } from './Ornament';
+import Logo from './Logo';
 
 type Props = {
   title: string;
@@ -78,7 +78,7 @@ export default function LoginGate({ title, hint, sessionKey, loginFn, children }
   return (
     <div className="mx-auto max-w-md animate-fadeUp rounded-3xl border border-gold-200 bg-white p-6 shadow-card sm:p-8">
       <div className="text-center">
-        <Diya size={44} className="mx-auto" />
+        <Logo size={64} className="mx-auto" />
         <h2 className="mt-2 font-serifbn text-xl font-bold text-maroon-800">{title}</h2>
         {hint && <p className="mt-1 text-sm text-stone-500">{hint}</p>}
       </div>

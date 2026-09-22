@@ -36,6 +36,19 @@ body {
 input, select, textarea { font-size: 16px; } /* prevent iOS zoom */
 ::selection { background: #f4c8cd; }
 
+/* ── html2canvas ফন্ট-বেসলাইন প্রোব ফিক্স ──
+   ক্যাপচারের আগে html2canvas body-তে একটি লুকানো div বসায়: ভেতরে একটি span
+   ও একটি ১px img (vertical-align: baseline) — দুটোর অবস্থান থেকে ফন্টের
+   বেসলাইন মাপে। কিন্তু Tailwind preflight-এর `img { display: block }`
+   সেই img-কে পরের লাইনে ঠেলে দেয়, ফলে মাপা বেসলাইন ~line-height পরিমাণ
+   বেশি আসে এবং ডাউনলোড করা ছবি/PDF-এ সব লেখা কয়েক পিক্সেল নিচে আঁকা হয়।
+   নিচের নিয়মটি শুধু ওই প্রোব img-কেই inline রাখে — অ্যাপের অন্য কোনো ছবিতে
+   এর প্রভাব নেই। */
+div[style*="visibility: hidden"][style*="white-space: nowrap"] > img[style*="vertical-align: baseline"] {
+  display: inline !important;
+  vertical-align: baseline !important;
+}
+
 /* Diya flame flicker */
 .flame { transform-origin: center 78%; animation: flame 2.4s ease-in-out infinite; }
 @keyframes flame {
