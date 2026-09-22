@@ -1,9 +1,9 @@
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PAYMENT_BRAND, PAYMENT_LABELS, PAYMENT_NUMBERS, PRICES, SITE, EVENTS, PUJA_SCHEDULE, formatPayNumber, localPayNumber } from '../config';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { formatTaka, toBn, toEn } from '../lib/bn';
-import { downloadSheetPdf, downloadSheetPng } from '../lib/exportSheet';
+import { downloadSheetPdf, downloadSheetPng, prewarmExport } from '../lib/exportSheet';
 import QtyStepper from '../components/QtyStepper';
 import InvitationSheet, { SHEET_W } from '../components/InvitationSheet';
 import { OrnamentDivider } from '../components/Ornament';
@@ -80,7 +80,7 @@ const DonateOptionCard = memo(function DonateOptionCard({
 export default function PublicForm() {
   const sheetRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState<'png' | 'pdf' | null>(null);
-  const [downloadErr, setDownloadErr] = useState('');
+  const [downloadErr, setDownloadErr] = useState<{ msg: string; detail?: string } | null>(null);
   const [name, setName] = useState('');
   const [present, setPresent] = useState('');
   const [permanent, setPermanent] = useState('');
@@ -168,6 +168,13 @@ export default function PublicForm() {
     }
   }
 
+  // রসিদ স্ক্রিনে পৌঁছালেই ক্যাপচার লাইব্রেরিগুলো আগেভাগে নামিয়ে রাখি —
+  // বাটনে ক্লিকের সময় অপেক্ষা করতে হয় না, আর নতুন ডেপ্লয়ের সাথে
+  // chunk হারিয়ে যাওয়ার ঝুঁকিও কমে
+  useEffect(() => {
+    if (done) prewarmExport();
+  }, [done]);
+
   // ─── ডাউনলোড: অফ-স্ক্রিন A4 আমন্ত্রণপত্র থেকে ছবি/PDF ───
   const fileBase = useMemo(() => {
     const slug = name.trim().replace(/\s+/g, '-').slice(0, 30);
@@ -187,7 +194,7 @@ export default function PublicForm() {
     const node = sheetRef.current;
     if (!node || downloading) return;
     setDownloading(kind);
-    setDownloadErr('');
+    setDownloadErr(null);
     try {
       if (kind === 'png') {
         await downloadSheetPng(node, `${fileBase}.png`);
@@ -196,7 +203,14 @@ export default function PublicForm() {
       }
     } catch (err) {
       console.error('Download failed:', err);
-      setDownloadErr('ডাউনলোড করা যায়নি। আবার চেষ্টা করুন অথবা স্ক্রিনশট নিন।');
+      const detail = getErrorMessage(err);
+      // নতুন ডেপ্লয়ের পর পুরোনো ট্যাব থেকে চেষ্টা করলে chunk লোড হয় না
+      const stale = /dynamically imported module|Importing a module script|Failed to fetch|ChunkLoadError/i.test(detail);
+      setDownloadErr(
+        stale
+          ? { msg: 'সাইটটি আপডেট হয়েছে — পেজ রিফ্রেশ করে আবার চেষ্টা করুন।' }
+          : { msg: 'ডাউনলোড করা যায়নি। আবার চেষ্টা করুন অথবা স্ক্রিনশট নিন।', detail }
+      );
     } finally {
       setDownloading(null);
     }
@@ -326,9 +340,12 @@ export default function PublicForm() {
           ডাউনলোডে পাবেন সম্পূর্ণ এক পাতার (A4) সাজানো আমন্ত্রণপত্র — ছাপার উপযোগী।
         </p>
         {downloadErr && (
-          <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-sm text-red-700">
-            {downloadErr}
-          </p>
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-sm text-red-700">
+            <p>{downloadErr.msg}</p>
+            {downloadErr.detail && (
+              <p className="mt-1 break-words text-[11px] leading-4 text-red-500">{downloadErr.detail}</p>
+            )}
+          </div>
         )}
 
         <button
