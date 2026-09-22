@@ -434,7 +434,7 @@ function Inner({ session }: { session: Session }) {
     if (tab === 'online') {
       exportCSV(
         'online-pronami.csv',
-        ['নাম', 'বর্তমান ঠিকানা', 'স্থায়ী ঠিকানা', 'ঔষধ ৳', 'গীতা', 'গীতা সংখ্যা', 'গাছ', 'গাছ সংখ্যা', 'কাপড়', 'কাপড় সংখ্যা', 'মোট ৳', 'মাধ্যম', 'মোবাইল', 'TrxID', 'যাচাই', 'যাচাই করেছেন', 'তারিখ'],
+        ['নাম', 'বর্তমান ঠিকানা', 'স্থায়ী ঠিকানা', 'ঔষধ ৳', 'গীতা', 'গীতা সংখ্যা', 'বৃক্ষ', 'বৃক্ষ সংখ্যা', 'বস্ত্র', 'বস্ত্র সংখ্যা', 'মোট ৳', 'মাধ্যম', 'মোবাইল', 'TrxID', 'যাচাই', 'যাচাই করেছেন', 'তারিখ'],
         filtered.map((r) => {
           const d = r as unknown as PublicDonation;
           return [
@@ -570,8 +570,8 @@ function Inner({ session }: { session: Session }) {
                     <div className="mt-2 flex flex-wrap gap-x-3 text-xs leading-5 text-stone-600">
                       {d.medicine_amount > 0 && <span>💊 ঔষধ {formatTaka(d.medicine_amount)}</span>}
                       {d.donate_geeta && <span>📕 গীতা × {toBn(d.geeta_qty)}</span>}
-                      {d.donate_tree && <span>🌳 গাছ × {toBn(d.tree_qty)}</span>}
-                      {d.donate_cloth && <span>👕 কাপড় × {toBn(d.cloth_qty)}</span>}
+                      {d.donate_tree && <span>🌳 বৃক্ষ × {toBn(d.tree_qty)}</span>}
+                      {d.donate_cloth && <span>👕 বস্ত্র × {toBn(d.cloth_qty)}</span>}
                       <span className="inline-flex items-center gap-1">
                         <WalletIcon wallet={d.payment_medium} size={16} />
                         {PAYMENT_LABELS[d.payment_medium] ?? d.payment_medium}

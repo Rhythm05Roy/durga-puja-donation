@@ -1,5 +1,7 @@
-import { memo, useCallback, useMemo, useState } from 'react';
-import { PAYMENT_BRAND, PAYMENT_LABELS, PAYMENT_NUMBERS, PRICES, SITE, formatPayNumber, localPayNumber } from '../config';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import { PAYMENT_BRAND, PAYMENT_LABELS, PAYMENT_NUMBERS, PRICES, SITE, EVENTS, PUJA_SCHEDULE, formatPayNumber, localPayNumber } from '../config';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { formatTaka, toBn, toEn } from '../lib/bn';
@@ -75,6 +77,8 @@ const DonateOptionCard = memo(function DonateOptionCard({
 });
 
 export default function PublicForm() {
+  const invitationRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
   const [name, setName] = useState('');
   const [present, setPresent] = useState('');
   const [permanent, setPermanent] = useState('');
@@ -162,37 +166,144 @@ export default function PublicForm() {
     }
   }
 
-  // ─── ✅ সফল প্রণামি রসিদ ───
+  async function downloadImage() {
+    if (!invitationRef.current) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(invitationRef.current, { scale: 2, useCORS: true });
+      const link = document.createElement('a');
+      link.download = `durga-puja-${SITE.yearBn}-invitation.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function downloadPDF() {
+    if (!invitationRef.current) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(invitationRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = (canvas.height * pdfW) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+      pdf.save(`durga-puja-${SITE.yearBn}-invitation.pdf`);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  // ─── ✅ সফল প্রণামি রসিদ + আমন্ত্রণ ───
   if (done) {
     return (
-      <div className="relative animate-fadeUp overflow-hidden rounded-3xl border border-gold-200 bg-white shadow-pop">
-        <div className="alpana-band" />
-        <div className="p-6 text-center sm:p-10">
-          <Diya size={56} className="mx-auto" />
-          <p className="mt-3 text-xs font-bold tracking-wide text-maroon-600">— শ্রীশ্রী দুর্গাপূজা {SITE.yearBn} —</p>
-          <h2 className="mt-2 font-serifbn text-2xl font-bold text-maroon-800 sm:text-3xl">
-            ধন্যবাদ, {name}! 🙏
-          </h2>
-          <p className="mt-4 px-2 leading-8 text-stone-700">
-            ভূরভুষিকালী সার্বজনীন শ্রীশ্রী দুর্গা মন্দির কমিটির পক্ষ থেকে আপনাকে জানাই আন্তরিক ধন্যবাদ। মা দুর্গার শ্রীচরণে আপনার ভক্তিপূর্ণ প্রণামি সফলভাবে গৃহীত হয়েছে।পরমেশ্বরী মায়ের অশেষ কৃপায় আপনার ও আপনার পরিবারের সকলের জীবন সুখ, শান্তি, সুস্বাস্থ্য ও সমৃদ্ধিতে ভরে উঠুক। 
-          </p>
-          <OrnamentDivider className="mx-auto mt-5 max-w-xs" />
-          <div className="mx-auto mt-5 inline-block rounded-2xl border-2 border-dashed border-gold-400 bg-gold-50 px-8 py-4">
-            <p className="text-sm text-stone-500">মোট প্রণামি</p>
-            <p className="text-4xl font-bold text-maroon-700">{formatTaka(total)}</p>
-            <p className="mt-1.5 flex items-center justify-center gap-1.5 text-xs text-stone-500">
-              <WalletIcon wallet={pay} size={16} /> {PAYMENT_LABELS[pay]} • TrxID: {txn}
+      <div className="animate-fadeUp space-y-4">
+        {/* Downloadable Invitation Card */}
+        <div ref={invitationRef} className="relative overflow-hidden rounded-3xl border-2 border-gold-400 bg-gradient-to-b from-[#fdf6e3] via-white to-[#fdf6e3] shadow-pop">
+          {/* Top Band */}
+          <div className="alpana-band" />
+
+          <div className="p-5 text-center sm:p-8">
+            <Diya size={48} className="mx-auto" />
+
+            <h1 className="mt-3 font-serifbn text-xl font-bold text-maroon-800 sm:text-2xl">
+              {SITE.org}
+            </h1>
+
+            {/* Jubilee Banner — full-width golden highlight */}
+            <div className="mx-auto mt-3 max-w-sm overflow-hidden rounded-xl border-2 border-amber-400 bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-600 py-2 shadow-lg" style={{ boxShadow: '0 0 20px rgba(251,191,36,.5), 0 0 40px rgba(251,191,36,.25)' }}>
+              <p className="font-serifbn text-sm font-bold tracking-wide text-white [text-shadow:0_2px_4px_rgba(0,0,0,.3)]">সুবর্ণ জয়ন্তী</p>
+              <p className="text-2xl font-black text-maroon-900 [text-shadow:0_1px_2px_rgba(255,255,255,.5)]">৫০ বছর</p>
+            </div>
+
+            <p className="mt-2 text-sm font-semibold text-maroon-600">শ্রীশ্রী দুর্গাপূজা {SITE.yearBn}</p>
+
+            <OrnamentDivider className="mx-auto mt-4 max-w-xs" />
+
+            {/* Thank You */}
+            <p className="mt-4 font-serifbn text-lg font-bold text-maroon-800">
+              ধন্যবাদ, {name}! 🙏
             </p>
+            <p className="mt-2 mx-auto max-w-md text-sm leading-7 text-stone-600">
+              মা দুর্গার শ্রীচরণে আপনার ভক্তিপূর্ণ প্রণামি সফলভাবে গৃহীত হয়েছে।
+              পরমেশ্বরী মায়ের অশেষ কৃপায় আপনার ও আপনার পরিবারের সকলের জীবন সুখ, শান্তি, সুস্বাস্থ্য ও সমৃদ্ধিতে ভরে উঠুক।
+            </p>
+
+            {/* Donation Summary */}
+            <div className="mx-auto mt-4 inline-block rounded-2xl border-2 border-dashed border-gold-400 bg-gold-50 px-6 py-3">
+              <p className="text-xs text-stone-500">মোট প্রণামি</p>
+              <p className="text-3xl font-bold text-maroon-700">{formatTaka(total)}</p>
+              <p className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-stone-500">
+                <WalletIcon wallet={pay} size={14} /> {PAYMENT_LABELS[pay]} • TrxID: {txn}
+              </p>
+            </div>
+
+            <OrnamentDivider className="mx-auto mt-4 max-w-xs" />
+
+            {/* Invitation */}
+            <div className="mt-4 text-left mx-auto max-w-md">
+              <p className="text-sm leading-7 text-stone-700 text-center italic">
+                {SITE.invitationIntro}
+              </p>
+
+              {/* Events */}
+              <div className="mt-3 space-y-2">
+                {EVENTS.map((ev, i) => (
+                  <div key={i} className="flex items-start gap-2 rounded-xl bg-gold-50/80 p-2.5">
+                    <span className="mt-0.5 text-lg">{ev.icon}</span>
+                    <div>
+                      <p className="text-sm font-bold text-maroon-800">{ev.title}</p>
+                      <p className="text-[11px] text-stone-500">{ev.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <OrnamentDivider className="mx-auto mt-4 max-w-[200px]" />
+
+              {/* Puja Schedule */}
+              <p className="mt-3 text-center font-serifbn font-bold text-maroon-800 text-sm">পূজার সময়সূচী {SITE.yearBn}</p>
+              <div className="mt-2 space-y-1">
+                {PUJA_SCHEDULE.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-lg bg-maroon-50 px-3 py-1.5 text-[11px]">
+                    <span className="font-bold text-maroon-800">{s.event}</span>
+                    <span className="text-stone-500">{s.date} ({s.day})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="mt-5 font-serifbn font-bold text-maroon-800 text-sm">— {SITE.org} পরিবার 🙏</p>
           </div>
-          <p className="mt-6 font-serifbn font-bold text-maroon-800">— {SITE.org} পরিবার 🙏</p>
+          <div className="alpana-band" />
+        </div>
+
+        {/* Download Buttons */}
+        <div className="flex gap-3">
           <button
-            onClick={() => window.location.reload()}
-            className="mt-6 rounded-xl bg-maroon-700 px-8 py-3 font-bold text-amber-200 shadow-card transition hover:bg-maroon-800 active:scale-95"
+            onClick={() => void downloadImage()}
+            disabled={downloading}
+            className="flex-1 rounded-xl border-2 border-maroon-600 bg-white py-3 font-bold text-maroon-700 shadow-card transition hover:bg-maroon-50 active:scale-95 disabled:opacity-50"
           >
-            নতুন প্রণামি করুন
+            {downloading ? '⏳ তৈরি হচ্ছে...' : '📥 ছবি ডাউনলোড'}
+          </button>
+          <button
+            onClick={() => void downloadPDF()}
+            disabled={downloading}
+            className="flex-1 rounded-xl bg-maroon-700 py-3 font-bold text-amber-200 shadow-card transition hover:bg-maroon-800 active:scale-95 disabled:opacity-50"
+          >
+            {downloading ? '⏳ তৈরি হচ্ছে...' : '📄 PDF ডাউনলোড'}
           </button>
         </div>
-        <div className="alpana-band" />
+
+        <button
+          onClick={() => window.location.reload()}
+          className="w-full rounded-xl border border-stone-300 bg-white py-3 font-semibold text-stone-600 transition hover:bg-stone-50"
+        >
+          নতুন প্রণামি করুন
+        </button>
       </div>
     );
   }
@@ -298,11 +409,11 @@ export default function PublicForm() {
             checked={geetaOn} onToggle={toggleGeeta} qty={geetaQty} onQty={setGeetaQty}
           />
           <DonateOptionCard
-            icon="🌳" title="গাছ" desc="পরিবেশের জন্য বৃক্ষরোপণ" unitPrice={PRICES.tree}
+            icon="🌳" title="বৃক্ষ" desc="পরিবেশের জন্য বৃক্ষরোপণ" unitPrice={PRICES.tree}
             checked={treeOn} onToggle={toggleTree} qty={treeQty} onQty={setTreeQty}
           />
           <DonateOptionCard
-            icon="👕" title="কাপড়" desc="পূজায় নতুন কাপড় বিতরণ" unitPrice={PRICES.cloth}
+            icon="👕" title="বস্ত্র" desc="পূজায় নতুন বস্ত্র বিতরণ" unitPrice={PRICES.cloth}
             checked={clothOn} onToggle={toggleCloth} qty={clothQty} onQty={setClothQty}
           />
         </div>
@@ -316,8 +427,8 @@ export default function PublicForm() {
           <div className="space-y-0.5 text-right text-xs leading-5 text-amber-100">
             <div>💊 ঔষধ: {formatTaka(medNum)}</div>
             {geetaOn && <div>📕 গীতা × {toBn(geetaQty)} = {formatTaka(geetaQty * PRICES.geeta)}</div>}
-            {treeOn && <div>🌳 গাছ × {toBn(treeQty)} = {formatTaka(treeQty * PRICES.tree)}</div>}
-            {clothOn && <div>👕 কাপড় × {toBn(clothQty)} = {formatTaka(clothQty * PRICES.cloth)}</div>}
+            {treeOn && <div>🌳 বৃক্ষ × {toBn(treeQty)} = {formatTaka(treeQty * PRICES.tree)}</div>}
+            {clothOn && <div>👕 বস্ত্র × {toBn(clothQty)} = {formatTaka(clothQty * PRICES.cloth)}</div>}
           </div>
         </div>
       </Card>
