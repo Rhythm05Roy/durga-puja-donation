@@ -10,6 +10,8 @@ import Logo from './Logo';
    • box-shadow ব্যবহার করা হয়নি (আঁকা হয় না) — বর্ডার/গ্রেডিয়েন্টে গভীরতা
    • সব অলংকরণ (পাড়, ফ্রেম, কোণা) একটিমাত্র SVG-তে, CSS transform ছাড়া
    • বাংলা লেখায় বড় letter-spacing নেই — যুক্তাক্ষর ভেঙে যায় */
+/** ক্লোন করা ডকুমেন্টে শিটটি খুঁজে পেতে */
+export const SHEET_ID = 'invitation-export-sheet';
 export const SHEET_W = 794;
 export const SHEET_H = 1123;
 
@@ -161,6 +163,7 @@ const InvitationSheet = forwardRef<HTMLDivElement, SheetProps>(function Invitati
   return (
     <div
       ref={ref}
+      id={SHEET_ID}
       style={{
         width: SHEET_W,
         height: SHEET_H,

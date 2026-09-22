@@ -1,4 +1,5 @@
 import type { jsPDF } from 'jspdf';
+import { SHEET_ID } from '../components/InvitationSheet';
 
 /* ─── আমন্ত্রণপত্র ছবি/PDF হিসেবে সেভ করার হেল্পার ───
    • স্ক্রিনের রেসপন্সিভ কার্ড নয়, নির্দিষ্ট A4 শিট ক্যাপচার হয় —
@@ -75,20 +76,78 @@ async function waitUntilPainted(node: HTMLElement) {
   });
 }
 
+/** ক্যাপচারের সময় শূন্য-মাপের ব্যাকগ্রাউন্ড ইমেজ থেকে ক্র্যাশ ঠেকায়।
+ *
+ *  html2canvas-এর `renderBackgroundImage()`-এ `url()` ব্যাকগ্রাউন্ডের শাখাটি
+ *  (গ্রেডিয়েন্টের শাখার মতো) মাপ যাচাই করে না। কোনো ছবির intrinsic size ০ হলে
+ *  অনুপাত হয় NaN → `Math.max(1, NaN)` = NaN → canvas.width = 0 →
+ *  `createPattern()` এক্সসেপশন ছুঁড়ে পুরো ডাউনলোড ভেঙে দেয়:
+ *    "The image argument is a canvas element with a width or height of 0"
+ *
+ *  আমাদের শিটে url() ব্যাকগ্রাউন্ড নেই, কিন্তু ব্রাউজার এক্সটেনশন (যেমন
+ *  ডার্ক-মোড এক্সটেনশন) পেজের গ্রেডিয়েন্টকে data-URL ছবিতে বদলে দিতে পারে।
+ *  তাই ক্যাপচার চলাকালীন এমন কলকে ১×১ স্বচ্ছ প্যাটার্নে বদলে দিই — কিছুই
+ *  আঁকা হয় না, বাকি পাতা ঠিকঠাক তৈরি হয়। */
+function withPatternGuard<T>(run: () => Promise<T>): Promise<T> {
+  const proto = CanvasRenderingContext2D.prototype;
+  const original = proto.createPattern;
+  let blank: HTMLCanvasElement | null = null;
+
+  proto.createPattern = function patched(
+    this: CanvasRenderingContext2D,
+    image: CanvasImageSource,
+    repetition: string | null
+  ) {
+    const src = image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number };
+    const w = src?.naturalWidth ?? src?.width ?? 0;
+    const h = src?.naturalHeight ?? src?.height ?? 0;
+    if (!(w > 0) || !(h > 0)) {
+      console.warn('[export] শূন্য-মাপের ব্যাকগ্রাউন্ড ইমেজ এড়ানো হলো');
+      if (!blank) {
+        blank = document.createElement('canvas');
+        blank.width = 1;
+        blank.height = 1;
+      }
+      return original.call(this, blank, repetition);
+    }
+    return original.call(this, image, repetition);
+  } as typeof proto.createPattern;
+
+  return run().finally(() => {
+    proto.createPattern = original;
+  });
+}
+
 async function capture(node: HTMLElement, scale: number): Promise<HTMLCanvasElement> {
   const html2canvas = (await import('html2canvas')).default;
-  const canvas = await html2canvas(node, {
-    scale,
-    backgroundColor: PAPER,
-    useCORS: true,
-    logging: false,
-    imageTimeout: 15000,
-    // অফ-স্ক্রিন শিটটির নিজস্ব মাপেই আঁকা হোক, উইন্ডোর মাপে নয়
-    width: node.offsetWidth,
-    height: node.offsetHeight,
-    windowWidth: Math.max(node.offsetWidth + 80, 1024),
-    windowHeight: Math.max(node.offsetHeight + 80, 1200),
-  });
+  const canvas = await withPatternGuard(() =>
+    html2canvas(node, {
+      scale,
+      backgroundColor: PAPER,
+      useCORS: true,
+      logging: false,
+      imageTimeout: 15000,
+      // অফ-স্ক্রিন শিটটির নিজস্ব মাপেই আঁকা হোক, উইন্ডোর মাপে নয়
+      width: node.offsetWidth,
+      height: node.offsetHeight,
+      windowWidth: Math.max(node.offsetWidth + 80, 1024),
+      windowHeight: Math.max(node.offsetHeight + 80, 1200),
+      // শিটের ডিজাইনে url() ব্যাকগ্রাউন্ড নেই। ডার্ক-মোডের মতো এক্সটেনশন
+      // গ্রেডিয়েন্টকে data-URL ছবিতে বদলে দিলে ক্লোনে আমাদের নিজের ইনলাইন
+      // মানটিই ফিরিয়ে আনি (না থাকলে none) — এক্সটেনশনের !important নিয়মকেও
+      // ছাড়িয়ে যেতে setProperty(..., 'important')
+      onclone: (doc) => {
+        const root = doc.getElementById(SHEET_ID);
+        const view = doc.defaultView;
+        if (!root || !view) return;
+        for (const el of [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]) {
+          if (!view.getComputedStyle(el).backgroundImage.includes('url(')) continue;
+          const own = el.style.backgroundImage;
+          el.style.setProperty('background-image', own && !own.includes('url(') ? own : 'none', 'important');
+        }
+      },
+    })
+  );
   if (!canvas.width || !canvas.height) throw new Error(`ফাঁকা ক্যানভাস (scale ${scale})`);
   return canvas;
 }
